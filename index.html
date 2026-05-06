@@ -656,14 +656,20 @@ footer { text-align: center; padding: 20px; font-size: 11px; color: var(--text-l
 
     <!-- VENDORS -->
     <div class="section" id="section-vendors">
-      <h2 class="section-title">Vendors</h2>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <h2 class="section-title" style="margin-bottom:0">Vendors</h2>
+        <button class="btn-sm" onclick="addVendorCategory()" style="background:none;color:var(--rose);border:1.5px dashed var(--rose);border-radius:100px;padding:6px 16px;">+ Add Vendor</button>
+      </div>
       <p class="section-sub">Compare, shortlist, and confirm your suppliers</p>
       <div class="vendor-grid" id="vendor-grid"></div>
     </div>
 
     <!-- BUDGET -->
     <div class="section" id="section-budget">
-      <h2 class="section-title">Budget</h2>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <h2 class="section-title" style="margin-bottom:0">Budget</h2>
+        <button class="btn-sm" onclick="addBudgetCategory()" style="background:none;color:var(--rose);border:1.5px dashed var(--rose);border-radius:100px;padding:6px 16px;">+ Add Category</button>
+      </div>
       <p class="section-sub">MVR 150,000 total · Track allocations and spending by category</p>
       <div class="budget-hero">
         <div>
@@ -1156,7 +1162,7 @@ footer { text-align: center; padding: 20px; font-size: 11px; color: var(--text-l
 // ── SUPABASE CONFIG ──
 const SB_URL = 'https://bffeyaqtncixxqyjnwhe.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJmZmV5YXF0bmNpeHhxeWpud2hlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNzI0NzQsImV4cCI6MjA5Mjk0ODQ3NH0.R6T3XdpgHIs1APhYg2r3Nc7tBUtk2QnEOlkj7oFOspE';
-const SB_HEADERS = { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' };
+const SB_HEADERS = { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', 'x-app-secret': 'rr2026maldives' };
 
 // ── LOCAL CACHE (rr3_ prefix) — used as fast read layer ──
 function loadLocal(key, def) {
@@ -1260,7 +1266,8 @@ async function flushSyncQueue() {
 // Compares updated_at timestamps — only re-renders if something actually changed
 const POLL_KEYS = ['guests','vendors','budget','notes','decisions','milestones','moodboard',
                    'mbIdCounter','guestLimits','inspoGallery','gifts','vowsData',
-                   'moodHistory','moodCurrent','timeline','pins','guestIdCounter','expenses','expIdCounter','customCategories'];
+                   'moodHistory','moodCurrent','timeline','pins','guestIdCounter','expenses',
+                   'expIdCounter','customCategories','customBudgetCats','customVendorCats'];
 
 const RENDER_MAP = {
   guests:       () => { guests = load('guests', guests); renderGuests(); renderOverview(); },
@@ -1283,6 +1290,8 @@ const RENDER_MAP = {
   expenses:     () => { expenses = load('expenses', expenses); if (document.getElementById('section-expenses').classList.contains('active')) renderExpenses(); },
   expIdCounter: () => { expIdCounter = load('expIdCounter', expIdCounter); },
   customCategories: () => { customCategories = load('customCategories', customCategories); renderCategoryPills(); },
+  customBudgetCats: () => { customBudgetCats = load('customBudgetCats', customBudgetCats); if (document.getElementById('section-budget').classList.contains('active')) renderBudget(); },
+  customVendorCats: () => { customVendorCats = load('customVendorCats', customVendorCats); if (document.getElementById('section-vendors').classList.contains('active')) renderVendors(); },
 };
 
 async function pollRemoteChanges() {
@@ -1366,6 +1375,8 @@ let budget = load('budget', {
   transport:    { allocated:4000,  spent:0, payer:'Both' },
   hair_makeup:  { allocated:6000,  spent:0, payer:'Raani' },
   wedding_cake: { allocated:3000,  spent:0, payer:'Both' },
+  dress:        { allocated:8000,  spent:0, payer:'Raani' },
+  suit:         { allocated:5000,  spent:0, payer:'Rilwan' },
   honeymoon:    { allocated:5000,  spent:0, payer:'Both' },
   stationery:   { allocated:4000,  spent:0, payer:'Both' },
 });
@@ -1410,6 +1421,8 @@ let expenses      = load('expenses', []);
 let expFilter     = 'all';
 let expIdCounter  = load('expIdCounter', 0);
 let customCategories = load('customCategories', []);
+let customBudgetCats = load('customBudgetCats', []);
+let customVendorCats = load('customVendorCats', []);
 let paletteFilter = '';
 let inspoFilter   = '';
 
@@ -1907,84 +1920,163 @@ function setLimit(key, val) {
 }
 
 // ── VENDORS ──
+function allVendors() {
+  const base = { ...vendors };
+  customVendorCats.forEach(c => { if (!base[c.key]) base[c.key] = c; });
+  return base;
+}
+
 function renderVendors() {
-  document.getElementById('vendor-grid').innerHTML = Object.entries(vendors).map(([key, v]) => `
-    <div class="vendor-card">
-      <div class="vendor-header">
-        <span class="vendor-icon">${v.icon}</span>
-        <div><div class="vendor-name">${v.name}</div></div>
+  const all = allVendors();
+  document.getElementById('vendor-grid').innerHTML = Object.entries(all).map(([key, v]) => {
+    const isCustom = customVendorCats.some(c => c.key === key);
+    const packages = v.options || [];
+    return `<div class="vendor-card">
+      <div class="vendor-header" style="justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span class="vendor-icon">${v.icon||'📋'}</span>
+          <div class="vendor-name">${v.name}</div>
+        </div>
+        ${isCustom ? `<button class="btn-icon" style="color:#c04040;font-size:13px;" onclick="removeVendorCategory('${key}')" title="Remove vendor">🗑</button>` : ''}
       </div>
       <div class="vendor-status-bar">
-        <span class="status-badge status-${v.status}">${v.status}</span>
+        <span class="status-badge status-${v.status||'researching'}">${v.status||'researching'}</span>
         <select style="border:none;background:none;font-size:11px;color:var(--text-muted);cursor:pointer;font-family:Jost,sans-serif;" onchange="setVendorStatus('${key}',this.value)">
-          <option value="researching" ${v.status==='researching'?'selected':''}>Researching</option>
+          <option value="researching" ${(v.status||'researching')==='researching'?'selected':''}>Researching</option>
           <option value="shortlisted" ${v.status==='shortlisted'?'selected':''}>Shortlisted</option>
           <option value="booked"      ${v.status==='booked'?'selected':''}>Booked ✓</option>
         </select>
       </div>
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--rose);font-weight:500;margin-bottom:8px;">Packages</div>
       <div class="vendor-options">
-        ${v.options.map((opt,i) => {
-          const comments = opt.comments || [];
-          return `<div class="vendor-option">
-            <input type="radio" name="vendor_${key}" ${v.chosen===i?'checked':''} onchange="setChosen('${key}',${i})">
-            <span class="vo-name">${opt.name}</span>
-            ${opt.price ? `<span class="vo-price">MVR ${Number(opt.price).toLocaleString()}</span>` : ''}
-            <button class="btn-icon" style="font-size:12px" onclick="removeVendorOption('${key}',${i})">✕</button>
-          </div>
-          <div class="vo-comments">
-            ${comments.map(c => `<div class="vo-comment"><span class="vo-comment-who">${c.who}</span><span class="vo-comment-text">${c.text}</span></div>`).join('')}
-            <div class="vo-comment-input">
-              <select id="vc-who-${key}-${i}" style="border:1px solid var(--border);border-radius:8px;padding:4px 8px;font-size:11px;font-family:Jost,sans-serif;background:white;outline:none;color:var(--text-muted);">
-                <option>Rilwan</option><option>Raani</option>
-              </select>
-              <input id="vc-inp-${key}-${i}" placeholder="Comment…" onkeydown="if(event.key==='Enter')addVendorComment('${key}',${i})">
-              <button class="btn-sm" style="padding:4px 10px;font-size:11px" onclick="addVendorComment('${key}',${i})">Add</button>
+        ${packages.map((pkg, i) => {
+          const comments = pkg.comments || [];
+          return `<div style="border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:8px;background:var(--cream);">
+            <div style="display:flex;align-items:flex-start;gap:8px;">
+              <input type="radio" name="vendor_${key}" ${v.chosen===i?'checked':''} onchange="setChosen('${key}',${i})" style="margin-top:3px;accent-color:var(--rose);flex-shrink:0;">
+              <div style="flex:1;">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                  <span style="font-weight:500;font-size:13px;">${pkg.name}</span>
+                  <div style="display:flex;align-items:center;gap:6px;">
+                    ${pkg.price ? `<span class="vo-price">MVR ${Number(pkg.price).toLocaleString()}</span>` : ''}
+                    <button class="btn-icon" style="font-size:12px;color:#c04040;" onclick="removeVendorOption('${key}',${i})">✕</button>
+                  </div>
+                </div>
+                ${pkg.desc ? `<div style="font-size:12px;color:var(--text-muted);margin-top:3px;">${pkg.desc}</div>` : ''}
+              </div>
+            </div>
+            <div class="vo-comments" style="margin-top:8px;">
+              ${comments.map(c => `<div class="vo-comment"><span class="vo-comment-who">${c.who}</span><span class="vo-comment-text">${c.text}</span></div>`).join('')}
+              <div class="vo-comment-input">
+                <select id="vc-who-${key}-${i}" style="border:1px solid var(--border);border-radius:8px;padding:4px 8px;font-size:11px;font-family:Jost,sans-serif;background:white;outline:none;color:var(--text-muted);">
+                  <option>Rilwan</option><option>Raani</option>
+                </select>
+                <input id="vc-inp-${key}-${i}" placeholder="Comment on this package…" onkeydown="if(event.key==='Enter')addVendorComment('${key}',${i})">
+                <button class="btn-sm" style="padding:4px 10px;font-size:11px" onclick="addVendorComment('${key}',${i})">Add</button>
+              </div>
             </div>
           </div>`;
         }).join('')}
       </div>
-      <div class="vendor-add-row">
-        <input class="vendor-input" id="vo-name-${key}" placeholder="Vendor name">
-        <input class="vendor-input" id="vo-price-${key}" placeholder="Price (MVR)" style="width:100px;flex:none">
-        <button class="btn-sm" onclick="addVendorOption('${key}')">Add</button>
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-light);font-weight:500;margin-bottom:6px;">Add package</div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;">
+        <div style="display:flex;gap:6px;">
+          <input class="vendor-input" id="vo-name-${key}" placeholder="Package name" style="flex:2;">
+          <input class="vendor-input" id="vo-price-${key}" placeholder="Price (MVR)" style="flex:1;">
+        </div>
+        <div style="display:flex;gap:6px;">
+          <input class="vendor-input" id="vo-desc-${key}" placeholder="Package description (optional)" style="flex:1;">
+          <button class="btn-sm" onclick="addVendorOption('${key}')">Add</button>
+        </div>
       </div>
-      <textarea class="vendor-notes" placeholder="Notes, contacts, links…" onchange="saveVendorNote('${key}',this.value)">${v.notes}</textarea>
-    </div>
-  `).join('');
+      <textarea class="vendor-notes" placeholder="Notes, contacts, website…" onchange="saveVendorNote('${key}',this.value)">${v.notes||''}</textarea>
+    </div>`;
+  }).join('');
 }
-function setVendorStatus(key, val) { vendors[key].status = val; save('vendors', vendors); renderVendors(); }
-function setChosen(key, i) { vendors[key].chosen = i; save('vendors', vendors); }
-function addVendorOption(key) {
-  const name = document.getElementById('vo-name-' + key).value.trim();
-  if (!name) return;
-  vendors[key].options.push({ name, price: document.getElementById('vo-price-' + key).value.trim(), note:'', comments:[] });
-  save('vendors', vendors); renderVendors();
+function setVendorStatus(key, val) {
+  const isCustom = customVendorCats.some(c => c.key === key);
+  if (isCustom) { const ci = customVendorCats.findIndex(c => c.key === key); customVendorCats[ci].status = val; save('customVendorCats', customVendorCats); }
+  else { vendors[key].status = val; save('vendors', vendors); }
+  renderVendors();
+}
+function setChosen(key, i) {
+  const isCustom = customVendorCats.some(c => c.key === key);
+  if (isCustom) { const ci = customVendorCats.findIndex(c => c.key === key); customVendorCats[ci].chosen = i; save('customVendorCats', customVendorCats); }
+  else { vendors[key].chosen = i; save('vendors', vendors); }
 }
 function removeVendorOption(key, i) {
-  vendors[key].options.splice(i, 1);
-  if (vendors[key].chosen === i) vendors[key].chosen = null;
-  save('vendors', vendors); renderVendors();
+  const isCustom = customVendorCats.some(c => c.key === key);
+  if (isCustom) {
+    const ci = customVendorCats.findIndex(c => c.key === key);
+    customVendorCats[ci].options.splice(i, 1);
+    if (customVendorCats[ci].chosen === i) customVendorCats[ci].chosen = null;
+    save('customVendorCats', customVendorCats);
+  } else {
+    vendors[key].options.splice(i, 1);
+    if (vendors[key].chosen === i) vendors[key].chosen = null;
+    save('vendors', vendors);
+  }
+  renderVendors();
 }
-function saveVendorNote(key, val) { vendors[key].notes = val; save('vendors', vendors); }
+function saveVendorNote(key, val) {
+  const isCustom = customVendorCats.some(c => c.key === key);
+  if (isCustom) { const ci = customVendorCats.findIndex(c => c.key === key); customVendorCats[ci].notes = val; save('customVendorCats', customVendorCats); }
+  else { vendors[key].notes = val; save('vendors', vendors); }
+}
 function addVendorComment(key, i) {
   const inp  = document.getElementById('vc-inp-' + key + '-' + i);
   const who  = document.getElementById('vc-who-' + key + '-' + i).value;
   const text = inp?.value.trim();
   if (!text) return;
-  if (!vendors[key].options[i].comments) vendors[key].options[i].comments = [];
-  vendors[key].options[i].comments.push({ who, text });
-  save('vendors', vendors); inp.value = ''; renderVendors();
+  const isCustom = customVendorCats.some(c => c.key === key);
+  if (isCustom) {
+    const ci = customVendorCats.findIndex(c => c.key === key);
+    if (!customVendorCats[ci].options[i].comments) customVendorCats[ci].options[i].comments = [];
+    customVendorCats[ci].options[i].comments.push({ who, text });
+    save('customVendorCats', customVendorCats);
+  } else {
+    if (!vendors[key].options[i].comments) vendors[key].options[i].comments = [];
+    vendors[key].options[i].comments.push({ who, text });
+    save('vendors', vendors);
+  }
+  inp.value = ''; renderVendors();
 }
-
+  const name = document.getElementById('vo-name-' + key).value.trim();
+  if (!name) return;
+  const price = document.getElementById('vo-price-' + key).value.trim();
+  const desc  = document.getElementById('vo-desc-' + key)?.value.trim() || '';
+  const target = allVendors();
+  if (!target[key].options) target[key].options = [];
+  target[key].options.push({ name, price, desc, comments:[] });
+  // persist to correct store
+  if (customVendorCats.some(c => c.key === key)) {
+    const ci = customVendorCats.findIndex(c => c.key === key);
+    customVendorCats[ci] = target[key];
+    save('customVendorCats', customVendorCats);
+  } else {
+    vendors[key] = target[key];
+    save('vendors', vendors);
+  }
+  renderVendors();
+}
+function addVendorOption(key) {
 // ── BUDGET ──
-const CAT_NAMES = {
+let CAT_NAMES = {
   venue:'Venue', catering:'Catering', decor:'Decor', photography:'Photography',
   videography:'Videography', flowers:'Flowers', music:'Music / DJ', transport:'Transport',
-  hair_makeup:'Hair & Makeup', wedding_cake:'Wedding Cake', honeymoon:'Honeymoon Travel', stationery:'Invitations'
+  hair_makeup:'Hair & Makeup', wedding_cake:'Wedding Cake', dress:'Wedding Dress',
+  suit:'Groom Suit', honeymoon:'Honeymoon Travel', stationery:'Invitations'
 };
+function allBudgetEntries() {
+  const base = { ...budget };
+  customBudgetCats.forEach(c => { if (!base[c.key]) base[c.key] = { allocated:0, spent:0, payer:'Both', name:c.name }; });
+  return base;
+}
+
 function renderBudget() {
-  const totalAlloc = Object.values(budget).reduce((s,b) => s + (Number(b.allocated)||0), 0);
-  const totalSpent = Object.values(budget).reduce((s,b) => s + (Number(b.spent)||0), 0);
+  const all = allBudgetEntries();
+  const totalAlloc = Object.values(all).reduce((s,b) => s + (Number(b.allocated)||0), 0);
+  const totalSpent = Object.values(all).reduce((s,b) => s + (Number(b.spent)||0), 0);
   const pct = Math.min(100, Math.round(totalAlloc / TOTAL_BUDGET * 100));
   const spentPctOfAlloc = totalAlloc > 0 ? Math.round(totalSpent / totalAlloc * 100) : 0;
   document.getElementById('budget-bar').style.width = pct + '%';
@@ -1993,14 +2085,19 @@ function renderBudget() {
   document.getElementById('budget-remaining-text').textContent = `MVR ${(TOTAL_BUDGET - totalAlloc).toLocaleString()} remaining`;
   document.getElementById('budget-spent-pct').textContent = `${spentPctOfAlloc}% of allocated`;
 
-  document.getElementById('budget-cats').innerHTML = Object.entries(budget).map(([key, b]) => {
+  document.getElementById('budget-cats').innerHTML = Object.entries(all).map(([key, b]) => {
     const spentPct = b.allocated > 0 ? Math.min(100, Math.round((b.spent||0) / b.allocated * 100)) : 0;
     const over = b.spent > b.allocated && b.allocated > 0;
     const payer = b.payer || 'Both';
+    const isCustom = customBudgetCats.some(c => c.key === key);
+    const displayName = b.name || CAT_NAMES[key] || key;
     return `<div class="budget-cat">
       <div class="budget-cat-name">
-        <span>${CAT_NAMES[key]||key}</span>
-        <span class="budget-cat-num">MVR ${Number(b.allocated||0).toLocaleString()}</span>
+        <span>${displayName}</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="budget-cat-num">MVR ${Number(b.allocated||0).toLocaleString()}</span>
+          ${isCustom ? `<button class="btn-icon" style="color:#c04040;font-size:12px;" onclick="removeBudgetCategory('${key}')" title="Remove">🗑</button>` : ''}
+        </div>
       </div>
       <div class="budget-cat-sub">Spent: MVR ${Number(b.spent||0).toLocaleString()} · ${spentPct}%${over?' ⚠️ Over budget':''}</div>
       <div class="mini-bar-wrap"><div class="mini-bar ${over?'over':''}" style="width:${spentPct}%"></div></div>
@@ -2017,8 +2114,19 @@ function renderBudget() {
   }).join('');
 }
 function updateBudget(key, field, val) {
-  budget[key][field] = field === 'payer' ? val : (Number(val) || 0);
-  save('budget', budget); renderBudget();
+  const isCustom = customBudgetCats.some(c => c.key === key);
+  if (isCustom) {
+    const ci = customBudgetCats.findIndex(c => c.key === key);
+    if (!customBudgetCats[ci].data) customBudgetCats[ci].data = { allocated:0, spent:0, payer:'Both' };
+    // also mirror into allBudgetEntries via budget object
+    if (!budget[key]) budget[key] = { allocated:0, spent:0, payer:'Both', name: customBudgetCats[ci].name };
+    budget[key][field] = field === 'payer' ? val : (Number(val)||0);
+    save('budget', budget);
+  } else {
+    budget[key][field] = field === 'payer' ? val : (Number(val)||0);
+    save('budget', budget);
+  }
+  renderBudget();
 }
 
 // ── NOTES ──
@@ -2446,18 +2554,51 @@ function renderMood() {
 // ── DAY-OF TIMELINE ──
 function renderTimeline() {
   const sorted = [...timeline].sort((a,b) => a.time.localeCompare(b.time));
-  document.getElementById('timeline-list').innerHTML = sorted.map((item, i) => {
+  document.getElementById('timeline-list').innerHTML = sorted.map((item) => {
     const origIdx = timeline.indexOf(item);
-    return `<div class="timeline-item">
+    return `<div class="timeline-item" id="tl-item-${origIdx}">
       <div class="timeline-dot"></div>
       <div class="timeline-card">
-        <div class="timeline-time">${item.time}</div>
-        <div class="timeline-event">${item.event}</div>
-        ${item.note ? `<div class="timeline-note">${item.note}</div>` : ''}
-        <button class="btn-icon" style="font-size:11px;color:#c04040;margin-top:4px;" onclick="deleteTimelineItem(${origIdx})">Remove</button>
+        <div id="tl-view-${origIdx}">
+          <div class="timeline-time">${item.time}</div>
+          <div class="timeline-event">${item.event}</div>
+          ${item.note ? `<div class="timeline-note">${item.note}</div>` : ''}
+          <div style="display:flex;gap:8px;margin-top:6px;">
+            <button class="btn-icon" style="font-size:11px;color:var(--rose);" onclick="editTimelineItem(${origIdx})">✏️ Edit</button>
+            <button class="btn-icon" style="font-size:11px;color:#c04040;" onclick="deleteTimelineItem(${origIdx})">Remove</button>
+          </div>
+        </div>
+        <div id="tl-edit-${origIdx}" style="display:none;">
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <input type="time" id="tl-edit-time-${origIdx}" value="${item.time}" style="border:1.5px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;font-family:Jost,sans-serif;outline:none;">
+            <input type="text" id="tl-edit-event-${origIdx}" value="${item.event}" placeholder="Event" style="border:1.5px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;font-family:Jost,sans-serif;outline:none;">
+            <input type="text" id="tl-edit-note-${origIdx}" value="${item.note||''}" placeholder="Notes" style="border:1.5px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;font-family:Jost,sans-serif;outline:none;">
+            <div style="display:flex;gap:6px;">
+              <button class="btn-sm" onclick="saveTimelineEdit(${origIdx})">Save</button>
+              <button class="btn-cancel" onclick="cancelTimelineEdit(${origIdx})" style="font-size:12px;padding:5px 12px;">Cancel</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>`;
   }).join('');
+}
+function editTimelineItem(i) {
+  document.getElementById('tl-view-' + i).style.display = 'none';
+  document.getElementById('tl-edit-' + i).style.display = 'block';
+}
+function cancelTimelineEdit(i) {
+  document.getElementById('tl-view-' + i).style.display = 'block';
+  document.getElementById('tl-edit-' + i).style.display = 'none';
+}
+function saveTimelineEdit(i) {
+  const time  = document.getElementById('tl-edit-time-' + i).value;
+  const event = document.getElementById('tl-edit-event-' + i).value.trim();
+  const note  = document.getElementById('tl-edit-note-' + i).value.trim();
+  if (!time || !event) return;
+  timeline[i] = { time, event, note };
+  save('timeline', timeline);
+  renderTimeline();
 }
 function addTimelineItem() {
   const time  = document.getElementById('tl-time').value;
@@ -2629,6 +2770,8 @@ function initApp() {
   expenses       = load('expenses', expenses);
   expIdCounter   = load('expIdCounter', expIdCounter);
   customCategories = load('customCategories', customCategories);
+  customBudgetCats = load('customBudgetCats', customBudgetCats);
+  customVendorCats = load('customVendorCats', customVendorCats);
 
   renderOverview();
   renderGuestLimits();
@@ -2861,6 +3004,44 @@ function setInspoFilter(f, btn) {
   document.querySelectorAll('#inspo-filters .filter-pill').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   renderInspo();
+}
+
+// ── CUSTOM BUDGET CATEGORIES ──
+function addBudgetCategory() {
+  const name = prompt('New budget category name:');
+  if (!name || !name.trim()) return;
+  const key = name.trim().toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'') + '_' + Date.now();
+  customBudgetCats.push({ key, name: name.trim() });
+  budget[key] = { allocated:0, spent:0, payer:'Both', name: name.trim() };
+  save('customBudgetCats', customBudgetCats);
+  save('budget', budget);
+  renderBudget();
+}
+function removeBudgetCategory(key) {
+  if (!confirm('Remove this budget category? Spending data will be lost.')) return;
+  customBudgetCats = customBudgetCats.filter(c => c.key !== key);
+  delete budget[key];
+  save('customBudgetCats', customBudgetCats);
+  save('budget', budget);
+  renderBudget();
+}
+
+// ── CUSTOM VENDOR CATEGORIES ──
+function addVendorCategory() {
+  const name = prompt('New vendor category name:');
+  if (!name || !name.trim()) return;
+  const icons = ['📋','🎪','🎭','🎨','🎤','🌺','💒','🛳️','🎠','✨'];
+  const icon = icons[Math.floor(Math.random() * icons.length)];
+  const key = name.trim().toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'') + '_' + Date.now();
+  customVendorCats.push({ key, name: name.trim(), icon, options:[], chosen:null, notes:'', status:'researching' });
+  save('customVendorCats', customVendorCats);
+  renderVendors();
+}
+function removeVendorCategory(key) {
+  if (!confirm('Remove this vendor category?')) return;
+  customVendorCats = customVendorCats.filter(c => c.key !== key);
+  save('customVendorCats', customVendorCats);
+  renderVendors();
 }
 
 // iOS install banner
