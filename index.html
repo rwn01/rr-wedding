@@ -1071,7 +1071,11 @@ footer { text-align: center; padding: 20px; font-size: 11px; color: var(--text-l
         <div class="settings-label">Data</div>
         <div class="settings-row">
           <div>
-            <div class="settings-row-label">Export all data</div>
+            <div class="settings-row-label">Force sync to cloud</div>
+            <div class="settings-row-desc">Push all local data to Supabase right now</div>
+          </div>
+          <button class="btn-sm" style="background:none;color:var(--rose);border:1.5px solid var(--rose);border-radius:100px;padding:6px 16px;" onclick="forceSyncAll()">Sync now</button>
+        </div>
             <div class="settings-row-desc">Download a JSON backup of everything</div>
           </div>
           <button class="btn-sm" style="background:none;color:var(--rose);border:1.5px solid var(--rose);border-radius:100px;padding:6px 16px;" onclick="exportAllData()">Export</button>
@@ -2683,6 +2687,20 @@ function changePin(person) {
   pins[person] = newPin;
   save('pins', pins);
   alert(`${person}'s PIN has been updated ✓`);
+}
+
+function forceSyncAll() {
+  const keys = ['guests','vendors','budget','notes','decisions','milestones','moodboard',
+    'mbIdCounter','guestLimits','inspoGallery','gifts','vowsData','moodHistory','moodCurrent',
+    'timeline','pins','guestIdCounter','expenses','expIdCounter','customCategories',
+    'customBudgetCats','customVendorCats'];
+  setSyncStatus('syncing');
+  let done = 0;
+  keys.forEach(key => {
+    const val = loadLocal(key, null);
+    if (val === null) { done++; if (done === keys.length) setSyncStatus('synced'); return; }
+    sbSet(key, val).then(() => { done++; if (done === keys.length) { setSyncStatus('synced'); alert('All data synced to cloud ✓'); } });
+  });
 }
 
 function exportAllData() {
